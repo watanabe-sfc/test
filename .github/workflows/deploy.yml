@@ -1,17 +1,16 @@
-name: deploy blog site
+name: Upload files to S3
+
 on:
   push:
     branches:
-      - main
-    paths:
-      - "website/**"
-
-  workflow_dispatch:
+    - main
 
 env:
-  AWS_REGION: ap-northeast-1
-  AWS_ROLE_ARN: arn:aws:iam::992382417107:role/test-role
-  AWS_TARGET_S3_BUCKET: test-s3-auto-bucket
+  MY_AWS_REGION: 'ap-northeast-1'
+  AWS_ROLENAME: 'test-role'
+  AWS_S3_BUCKET: 'test-s3-auto-bucket'
+  SOURCE_DIR: ''
+  DEST_DIR: ''
 
 jobs:
   deploy:
@@ -20,24 +19,13 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Setup Hugo
-        uses: peaceiris/actions-hugo@v2
-        with:
-          hugo-version: "0.110.0"
-
-      - name: Build
-        run: |
-          cd website
-          HUGO_ENV=production hugo --minify
-
-      - name: Configure AWS credentials from IAM Role
-        uses: aws-actions/configure-aws-credentials@v1-node16
-        with:
-          role-to-assume: ${{ env.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Upload file to S3
-        run: aws s3 sync --delete website/public s3://${{ env.AWS_TARGET_S3_BUCKET }}/website/public
+    - name: Checkout
+      uses: actions/checkout@main
+    - name: Configure AWS credentials with IAM Role
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::992382417107:role/${{env.AWS_ROLENAME}}
+        aws-region: ${{env.MY_AWS_REGION}}
+    - name: Copy files to S3
+      run: |
+          aws s3 sync ${{env.SOURCE_DIR}} s3://${{env.AWS_S3_BUCKET}}/${{env.DEST_DIR}} --exclude '.*git*'
