@@ -1,26 +1,43 @@
-name: Deploy to S3
-
+name: deploy blog site
 on:
   push:
     branches:
-      - main  # mainブランチにプッシュされたときにトリガー
+      - main
+    paths:
+      - "website/**"
+
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-northeast-1
+  AWS_ROLE_ARN: arn:aws:iam::992382417107:role/test-role
+  AWS_TARGET_S3_BUCKET: test-s3-auto-bucket
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
+    permissions:
+      id-token: write
+      contents: read
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout
+        uses: actions/checkout@v3
 
-    - name: Install AWS CLI
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y awscli
+      - name: Setup Hugo
+        uses: peaceiris/actions-hugo@v2
+        with:
+          hugo-version: "0.110.0"
 
-    - name: Sync S3 bucket
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      run: |
-        aws s3 sync . s3://YOUR_S3_BUCKET_NAME --delete
+      - name: Build
+        run: |
+          cd website
+          HUGO_ENV=production hugo --minify
+
+      - name: Configure AWS credentials from IAM Role
+        uses: aws-actions/configure-aws-credentials@v1-node16
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Upload file to S3
+        run: aws s3 sync --delete website/public s3://${{ env.AWS_TARGET_S3_BUCKET }}/website/public
